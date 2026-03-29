@@ -1,0 +1,76 @@
+# =============================================================================
+# Kibana Configuration
+# Project: Suricata-Based NIDS with ELK Stack Integration
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Server
+# ---------------------------------------------------------------------------
+server.port: 5601
+server.host: "0.0.0.0"       # Bind to all interfaces; restrict via firewall
+server.name: "suricata-kibana"
+server.publicBaseUrl: "https://192.168.1.10:5601"   # Update to your Kibana host IP
+
+# ---------------------------------------------------------------------------
+# Elasticsearch connection – authenticated
+# ---------------------------------------------------------------------------
+elasticsearch.hosts: ["https://localhost:9200"]   # Update if Elasticsearch is remote
+elasticsearch.username: "kibana_system"
+elasticsearch.password: "${KIBANA_SYSTEM_PASSWORD}"   # Set via keystore or env var
+
+# SSL trust for the Elasticsearch CA certificate
+elasticsearch.ssl.certificateAuthorities: ["/etc/elasticsearch/certs/http_ca.crt"]
+elasticsearch.ssl.verificationMode: certificate
+
+# ---------------------------------------------------------------------------
+# Security – encryption keys (Module 8)
+# Generate random values: openssl rand -hex 32
+# ---------------------------------------------------------------------------
+xpack.security.encryptionKey: "CHANGE_ME_32_CHAR_ENCRYPTION_KEY_HERE_001"
+xpack.encryptedSavedObjects.encryptionKey: "CHANGE_ME_32_CHAR_ENCRYPTION_KEY_HERE_002"
+xpack.reporting.encryptionKey: "CHANGE_ME_32_CHAR_ENCRYPTION_KEY_HERE_003"
+
+# ---------------------------------------------------------------------------
+# TLS for Kibana HTTPS (optional but recommended for production)
+# ---------------------------------------------------------------------------
+# server.ssl.enabled: true
+# server.ssl.certificate: /etc/kibana/certs/kibana.crt
+# server.ssl.key: /etc/kibana/certs/kibana.key
+
+# ---------------------------------------------------------------------------
+# Logging
+# ---------------------------------------------------------------------------
+logging:
+  appenders:
+    file:
+      type: file
+      fileName: /var/log/kibana/kibana.log
+      layout:
+        type: json
+  root:
+    appenders: [default, file]
+    level: info
+
+# ---------------------------------------------------------------------------
+# Telemetry (disable for air-gapped environments)
+# ---------------------------------------------------------------------------
+telemetry.enabled: false
+telemetry.optIn: false
+
+# ---------------------------------------------------------------------------
+# Saved Objects import settings
+# ---------------------------------------------------------------------------
+savedObjects.maxImportPayloadBytes: 26214400
+
+# ---------------------------------------------------------------------------
+# Reporting
+# ---------------------------------------------------------------------------
+xpack.reporting.enabled: true
+xpack.reporting.kibanaServer.protocol: "https"
+xpack.reporting.kibanaServer.hostname: "localhost"
+xpack.reporting.kibanaServer.port: 5601
+
+# ---------------------------------------------------------------------------
+# Fleet (optional – for Elastic Agent management)
+# ---------------------------------------------------------------------------
+xpack.fleet.enabled: false

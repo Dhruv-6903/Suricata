@@ -1,0 +1,88 @@
+# =============================================================================
+# Elasticsearch Configuration
+# Project: Suricata-Based NIDS with ELK Stack Integration
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# Cluster
+# ---------------------------------------------------------------------------
+cluster.name: suricata-nids
+
+# ---------------------------------------------------------------------------
+# Node
+# ---------------------------------------------------------------------------
+node.name: suricata-node-1
+node.roles: [master, data, ingest]
+
+# ---------------------------------------------------------------------------
+# Paths
+# ---------------------------------------------------------------------------
+path.data: /var/lib/elasticsearch
+path.logs: /var/log/elasticsearch
+
+# ---------------------------------------------------------------------------
+# 11.1 Network Binding – must be accessible within the network
+# ---------------------------------------------------------------------------
+network.host: 0.0.0.0       # Bind to all interfaces; restrict with firewall
+http.port: 9200
+transport.port: 9300
+
+# ---------------------------------------------------------------------------
+# Discovery (single-node dev/small deployment)
+# ---------------------------------------------------------------------------
+discovery.type: single-node
+
+# ---------------------------------------------------------------------------
+# Security – authentication enabled (Module 10 / Module 7)
+# ---------------------------------------------------------------------------
+xpack.security.enabled: true
+
+xpack.security.enrollment.enabled: true
+
+# HTTP layer SSL/TLS
+xpack.security.http.ssl:
+  enabled: true
+  keystore.path: certs/http.p12
+
+# Transport layer SSL/TLS (node-to-node)
+xpack.security.transport.ssl:
+  enabled: true
+  verification_mode: certificate
+  keystore.path: certs/transport.p12
+  truststore.path: certs/transport.p12
+
+# ---------------------------------------------------------------------------
+# Index Management defaults
+# ---------------------------------------------------------------------------
+# Allow dynamic field mapping for Suricata EVE JSON
+index.mapper.dynamic: true
+
+# Default number of shards / replicas for new indices
+# (override per index via ILM / index template)
+# index.number_of_shards: 1
+# index.number_of_replicas: 0
+
+# ---------------------------------------------------------------------------
+# Memory Lock (prevent swap – improves performance)
+# ---------------------------------------------------------------------------
+bootstrap.memory_lock: false   # Set to true when /etc/security/limits.conf allows
+
+# ---------------------------------------------------------------------------
+# Thread pool tuning (adjust based on available CPU cores)
+# ---------------------------------------------------------------------------
+thread_pool.write.queue_size: 1000
+thread_pool.search.queue_size: 1000
+
+# ---------------------------------------------------------------------------
+# HTTP settings
+# ---------------------------------------------------------------------------
+http.max_content_length: 100mb
+http.compression: true
+
+# ---------------------------------------------------------------------------
+# Slow log thresholds
+# ---------------------------------------------------------------------------
+index.search.slowlog.threshold.query.warn: 10s
+index.search.slowlog.threshold.query.info: 5s
+index.search.slowlog.threshold.fetch.warn: 1s
+index.indexing.slowlog.threshold.index.warn: 10s

@@ -1,0 +1,322 @@
+%YAML 1.1
+---
+# =============================================================================
+# Suricata Configuration File
+# Project: Suricata-Based Network Intrusion Detection with ELK Stack Integration
+# =============================================================================
+
+# ---------------------------------------------------------------------------
+# 6.1 Network Interface – traffic capture
+# ---------------------------------------------------------------------------
+af-packet:
+  - interface: eth0          # Change to your monitoring interface (e.g. ens33, enp0s3)
+    threads: auto
+    cluster-id: 99
+    cluster-type: cluster_flow
+    defrag: yes
+    use-mmap: yes
+    tpacket-v3: yes
+    ring-size: 2048
+    block-size: 32768
+    block-timeout: 10
+    use-emergency-flush: yes
+
+pcap:
+  - interface: eth0
+
+# ---------------------------------------------------------------------------
+# 6.2 Network Scope Definition
+# ---------------------------------------------------------------------------
+vars:
+  address-groups:
+    HOME_NET: "[192.168.1.0/24]"   # Adjust to match your internal network
+    EXTERNAL_NET: "!$HOME_NET"
+    HTTP_SERVERS: "$HOME_NET"
+    SMTP_SERVERS: "$HOME_NET"
+    SQL_SERVERS: "$HOME_NET"
+    DNS_SERVERS: "$HOME_NET"
+    TELNET_SERVERS: "$HOME_NET"
+    AIM_SERVERS: "$EXTERNAL_NET"
+    DC_SERVERS: "$HOME_NET"
+    DNP3_SERVER: "$HOME_NET"
+    DNP3_CLIENT: "$HOME_NET"
+    MODBUS_CLIENT: "$HOME_NET"
+    MODBUS_SERVER: "$HOME_NET"
+    ENIP_CLIENT: "$HOME_NET"
+    ENIP_SERVER: "$HOME_NET"
+
+  port-groups:
+    HTTP_PORTS: "80"
+    SHELLCODE_PORTS: "!80"
+    ORACLE_PORTS: 1521
+    SSH_PORTS: 22
+    DNP3_PORTS: 20000
+    MODBUS_PORTS: 502
+    FILE_DATA_PORTS: "[$HTTP_PORTS,110,143]"
+    FTP_PORTS: 21
+    VXLAN_PORTS: 4789
+    TEREDO_PORTS: 3544
+
+# ---------------------------------------------------------------------------
+# 6.3 Log Correlation – Community ID
+# ---------------------------------------------------------------------------
+community-id: yes
+
+# ---------------------------------------------------------------------------
+# 6.4 Logging Configuration
+# ---------------------------------------------------------------------------
+outputs:
+  # ---- EVE JSON output (primary log, consumed by Filebeat) ----
+  - eve-log:
+      enabled: yes
+      filetype: regular
+      filename: /var/log/suricata/eve.json
+      community-id: yes
+      community-id-seed: 0
+      types:
+        - alert:
+            payload: yes
+            payload-buffer-size: 4kb
+            payload-printable: yes
+            packet: yes
+            metadata: yes
+            http-body: yes
+            http-body-printable: yes
+            tagged-packets: yes
+        - anomaly:
+            enabled: yes
+            types:
+              decode: yes
+              stream: yes
+              applayer: yes
+        - http:
+            extended: yes
+        - dns:
+            version: 2
+        - tls:
+            extended: yes
+        - files:
+            force-magic: yes
+        - smtp: {}
+        - ftp: {}
+        - ssh: {}
+        - stats:
+            totals: yes
+            threads: no
+            deltas: no
+        - flow: {}
+
+  # ---- Fast log (human-readable alert summary) ----
+  - fast:
+      enabled: yes
+      filename: /var/log/suricata/fast.log
+      append: yes
+
+  # ---- Stats log ----
+  - stats:
+      enabled: yes
+      filename: /var/log/suricata/stats.log
+      totals: yes
+      threads: no
+      null-values: no
+
+  # ---- Syslog ----
+  - syslog:
+      enabled: no
+      facility: local5
+      format: "[%i] <%d> -- "
+
+# ---------------------------------------------------------------------------
+# 6.5 Performance Configuration
+# ---------------------------------------------------------------------------
+flow:
+  memcap: 128mb
+  hash-size: 65536
+  prealloc: 10000
+  emergency-recovery: 30
+
+stream:
+  memcap: 64mb
+  checksum-validation: yes
+  inline: auto
+  reassembly:
+    memcap: 256mb
+    depth: 1mb
+    toserver-chunk-size: 2560
+    toclient-chunk-size: 2560
+    randomize-chunk-size: yes
+
+host:
+  hash-size: 4096
+  prealloc: 1000
+  memcap: 32mb
+
+defrag:
+  memcap: 32mb
+  hash-size: 65536
+  trackers: 65535
+  max-frags: 65535
+  prealloc: yes
+  timeout: 60
+
+# ---------------------------------------------------------------------------
+# Application Layer Protocols
+# ---------------------------------------------------------------------------
+app-layer:
+  protocols:
+    rdp:
+      enabled: yes
+    krb5:
+      enabled: yes
+    snmp:
+      enabled: yes
+    ikev2:
+      enabled: yes
+    tls:
+      enabled: yes
+      detection-ports:
+        dp: 443
+      ja3-fingerprints: auto
+      ja4-fingerprints: auto
+    dcerpc:
+      enabled: yes
+    ftp:
+      enabled: yes
+      memcap: 64mb
+    ssh:
+      enabled: yes
+      hassh: yes
+    smtp:
+      enabled: yes
+      raw-extraction: no
+      mime:
+        decode-mime: yes
+        decode-base64: yes
+        decode-quoted-printable: yes
+        header-value-depth: 2000
+        extract-urls: yes
+        body-md5: no
+      inspected-tracker:
+        content-limit: 100000
+        content-inspect-min-size: 32768
+        content-inspect-window: 4096
+    imap:
+      enabled: detection-only
+    http:
+      enabled: yes
+      libhtp:
+        default-config:
+          personality: IDS
+          request-body-limit: 100kb
+          response-body-limit: 100kb
+          request-body-minimal-inspect-size: 32kb
+          request-body-inspect-window: 4kb
+          response-body-minimal-inspect-size: 40kb
+          response-body-inspect-window: 16kb
+          response-body-decompress-layer-limit: 2
+          http-body-inline: auto
+          swf-decompression:
+            enabled: yes
+            type: both
+            compress-depth: 100kb
+            decompress-depth: 100kb
+          double-decode-path: no
+          double-decode-query: no
+    dns:
+      tcp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+      udp:
+        enabled: yes
+        detection-ports:
+          dp: 53
+    http2:
+      enabled: yes
+
+# ---------------------------------------------------------------------------
+# Detection Engine
+# ---------------------------------------------------------------------------
+detect:
+  profile: medium
+  custom-values:
+    toclient-groups: 3
+    toserver-groups: 25
+  sgh-mpm-context: auto
+  inspection-recursion-limit: 3000
+  prefilter:
+    default: mpm
+  grouping: {}
+  profiling:
+    grouping:
+      dump-to-disk: false
+      include-rules: false
+      json: true
+
+# ---------------------------------------------------------------------------
+# Rule Files
+# ---------------------------------------------------------------------------
+default-rule-path: /etc/suricata/rules
+
+rule-files:
+  - suricata.rules
+  - custom.rules
+
+# ---------------------------------------------------------------------------
+# Thresholds
+# ---------------------------------------------------------------------------
+threshold-file: /etc/suricata/threshold.conf
+
+# ---------------------------------------------------------------------------
+# Engine Analysis & Profiling
+# ---------------------------------------------------------------------------
+engine-analysis:
+  rules-fast-pattern: yes
+  rules: yes
+
+profiling:
+  rules:
+    enabled: yes
+    filename: /var/log/suricata/rule_perf.log
+    append: yes
+    limit: 10
+    json: yes
+  locks:
+    enabled: no
+  pcap-log:
+    enabled: no
+
+# ---------------------------------------------------------------------------
+# Packet Capture Replay
+# ---------------------------------------------------------------------------
+pcap-file:
+  checksum-checks: auto
+
+# ---------------------------------------------------------------------------
+# Misc
+# ---------------------------------------------------------------------------
+host-os-policy:
+  windows: [0.0.0.0/0]
+  bsd: []
+  bsd-right: []
+  old-linux: []
+  linux: []
+  old-solaris: []
+  solaris: []
+  hpux10: []
+  hpux11: []
+  irix: []
+  macos: []
+  vista: []
+  windows2k3: []
+
+magic-file: /usr/share/misc/magic
+
+coredump:
+  max-dump: unlimited
+
+unix-command:
+  enabled: auto
+
+legacy:
+  uricontent: enabled
