@@ -1,0 +1,149 @@
+# =============================================================================
+# Custom Suricata Detection Rules
+# File: /etc/suricata/rules/custom.rules
+# Project: Suricata-Based NIDS with ELK Stack Integration
+# =============================================================================
+# Format: action proto src_ip src_port direction dst_ip dst_port (options)
+
+# -----------------------------------------------------------------------------
+# HTTP Scanning / Enumeration
+# -----------------------------------------------------------------------------
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS \
+    (msg:"CUSTOM HTTP Directory Traversal Attempt"; \
+    flow:established,to_server; \
+    content:"../"; http_uri; \
+    classtype:web-application-attack; \
+    sid:9000001; rev:1;)
+
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS \
+    (msg:"CUSTOM HTTP SQL Injection Attempt"; \
+    flow:established,to_server; \
+    pcre:"/(\%27)|(\')|(\-\-)|(\%23)|(#)/i"; http_uri; \
+    classtype:web-application-attack; \
+    sid:9000002; rev:1;)
+
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS \
+    (msg:"CUSTOM HTTP XSS Attempt"; \
+    flow:established,to_server; \
+    content:"<script"; http_uri; nocase; \
+    classtype:web-application-attack; \
+    sid:9000003; rev:1;)
+
+# Nikto / vulnerability scanner detection
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS \
+    (msg:"CUSTOM HTTP Scanner User-Agent Nikto Detected"; \
+    flow:established,to_server; \
+    content:"Nikto"; http_user_agent; nocase; \
+    classtype:web-application-activity; \
+    sid:9000004; rev:1;)
+
+# Curl/wget automated tool detection (adjust threshold in production)
+alert http $EXTERNAL_NET any -> $HTTP_SERVERS $HTTP_PORTS \
+    (msg:"CUSTOM HTTP Automated Tool Detected (curl)"; \
+    flow:established,to_server; \
+    content:"curl/"; http_user_agent; \
+    classtype:policy-violation; \
+    sid:9000005; rev:1;)
+
+# -----------------------------------------------------------------------------
+# SSH Brute-Force
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET 22 \
+    (msg:"CUSTOM SSH Brute Force Attempt"; \
+    flow:established,to_server; \
+    threshold:type threshold, track by_src, count 5, seconds 60; \
+    classtype:attempted-admin; \
+    sid:9000006; rev:1;)
+
+# -----------------------------------------------------------------------------
+# DNS Reconnaissance
+# -----------------------------------------------------------------------------
+alert dns $HOME_NET any -> any any \
+    (msg:"CUSTOM DNS Excessive Queries (Possible Tunneling or Exfiltration)"; \
+    threshold:type threshold, track by_src, count 100, seconds 10; \
+    classtype:bad-unknown; \
+    sid:9000007; rev:1;)
+
+alert dns any any -> $HOME_NET any \
+    (msg:"CUSTOM DNS Query for Known Malicious Domain"; \
+    dns.query; content:"malicious-example.com"; nocase; \
+    classtype:trojan-activity; \
+    sid:9000008; rev:1;)
+
+# -----------------------------------------------------------------------------
+# ICMP Reconnaissance
+# -----------------------------------------------------------------------------
+alert icmp $EXTERNAL_NET any -> $HOME_NET any \
+    (msg:"CUSTOM ICMP Ping Sweep Detected"; \
+    itype:8; \
+    threshold:type threshold, track by_src, count 10, seconds 2; \
+    classtype:network-scan; \
+    sid:9000009; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Port Scan Detection
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET any \
+    (msg:"CUSTOM TCP SYN Port Scan Detected"; \
+    flags:S,12; \
+    threshold:type threshold, track by_src, count 20, seconds 5; \
+    classtype:network-scan; \
+    sid:9000010; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Malware Command & Control (C2) Patterns
+# -----------------------------------------------------------------------------
+alert http $HOME_NET any -> $EXTERNAL_NET any \
+    (msg:"CUSTOM Possible HTTP C2 Beacon (Low Entropy UA)"; \
+    flow:established,to_server; \
+    content:"Mozilla/4.0 (compatible)"; http_user_agent; \
+    classtype:trojan-activity; \
+    sid:9000011; rev:1;)
+
+# -----------------------------------------------------------------------------
+# FTP Brute Force
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET 21 \
+    (msg:"CUSTOM FTP Brute Force Attempt"; \
+    flow:established,to_server; \
+    content:"USER "; \
+    threshold:type threshold, track by_src, count 5, seconds 30; \
+    classtype:attempted-admin; \
+    sid:9000012; rev:1;)
+
+# -----------------------------------------------------------------------------
+# Telnet Access Attempt
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET 23 \
+    (msg:"CUSTOM Telnet Connection Attempt"; \
+    flow:to_server,established; \
+    classtype:policy-violation; \
+    sid:9000013; rev:1;)
+
+# -----------------------------------------------------------------------------
+# TLS Self-Signed Certificate
+# -----------------------------------------------------------------------------
+alert tls $HOME_NET any -> $EXTERNAL_NET any \
+    (msg:"CUSTOM TLS Self-Signed Certificate Detected"; \
+    tls.cert_issuer; content:"CN="; \
+    tls.cert_subject; content:"CN="; \
+    classtype:policy-violation; \
+    sid:9000014; rev:1;)
+
+# -----------------------------------------------------------------------------
+# SMB / EternalBlue Pattern
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET 445 \
+    (msg:"CUSTOM SMB Access from External Network"; \
+    flow:established,to_server; \
+    classtype:policy-violation; \
+    sid:9000015; rev:1;)
+
+# -----------------------------------------------------------------------------
+# RDP External Access
+# -----------------------------------------------------------------------------
+alert tcp $EXTERNAL_NET any -> $HOME_NET 3389 \
+    (msg:"CUSTOM RDP Access Attempt from External"; \
+    flow:to_server; \
+    classtype:attempted-admin; \
+    sid:9000016; rev:1;)
